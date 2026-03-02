@@ -1,19 +1,50 @@
-# Tactical RTS Command Interface (Simulation)
+# Tactical RTS Command Interface (Frontend Simulation)
 
-A frontend-only fake military command dashboard built with React + TypeScript + Tailwind + Framer Motion + Canvas + Zustand.
+Interfaz táctica estilo militar/cinemática, sin backend, construida con:
 
-## Quick start
+- React + TypeScript
+- TailwindCSS
+- Framer Motion
+- HTML Canvas (mapa + radar)
+- Zustand (estado/simulación)
+
+## Ejecutar localmente
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Implemented starter features
+## Features implementadas
 
-- Tactical map canvas with selection, waypoint assignment, pan/zoom, fog-of-war.
-- Radar scanner with sweep animation and fading blips.
-- Unit control panel with status + command controls.
-- Mission log terminal with timestamps, auto-scroll, typing animation.
+- **Tactical Map**
+  - Grid táctico estilizado
+  - Unidades moviéndose en tiempo real
+  - Click para seleccionar unidad
+  - Click para emitir waypoint
+  - Drag para pan
+  - Scroll para zoom
+  - Niebla de guerra visual
+  - Shift + click para airstrike
+- **Unit Control Panel**
+  - Health / morale / ammo
+  - Estado actual
+  - Comandos: Move, Attack, Defend, Recon
+  - Transiciones con Framer Motion
+- **Radar Scanner**
+  - Sweep circular animado
+  - Blips enemigos aleatorios
+  - Fade temporal de blips
+- **Mission Log Console**
+  - Estilo terminal
+  - Logs con timestamp
+  - Autoscroll
+  - Typing animation
+- **Airstrike Simulation**
+  - Selección de coordenada en mapa
+  - Explosión visual en canvas
+  - Daño radial en unidades cercanas
 
-See `docs/system-design.md` for architecture, state design, data models, and a build plan.
+## Documentación
+
+- Arquitectura, modelos de datos y plan de construcción: `docs/system-design.md`.

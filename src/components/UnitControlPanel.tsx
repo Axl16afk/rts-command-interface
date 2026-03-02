@@ -4,6 +4,8 @@ import { UnitCommand } from '../types/models';
 
 const commands: UnitCommand[] = ['move', 'attack', 'defend', 'recon'];
 
+const meterColor = (value: number) => (value > 65 ? 'bg-tactical-neon' : value > 35 ? 'bg-tactical-amber' : 'bg-red-500');
+
 export function UnitControlPanel() {
   const units = useBattleStore((state) => state.units);
   const selectedUnitId = useBattleStore((state) => state.selectedUnitId);
@@ -12,17 +14,35 @@ export function UnitControlPanel() {
   const selected = units.find((unit) => unit.id === selectedUnitId);
 
   return (
-    <div className="rounded-xl border border-tactical-neon/30 bg-tactical-panel/50 p-3 shadow-hud">
-      <h2 className="mb-3 font-mono text-xs uppercase tracking-widest text-tactical-neon">Unit Control Panel</h2>
+    <section className="rounded-xl border border-tactical-neon/30 bg-tactical-panel/50 p-3 shadow-hud">
+      <h2 className="mb-3 font-mono text-xs uppercase tracking-widest text-tactical-neon">UNIT CONTROL PANEL</h2>
       {selected ? (
-        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-          <p className="font-mono text-sm text-white">{selected.callsign}</p>
-          <div className="mt-3 space-y-1 font-mono text-xs text-slate-300">
-            <p>Health: {selected.health}%</p>
-            <p>Morale: {selected.morale}%</p>
-            <p>Ammo: {selected.ammo}%</p>
-            <p>Status: {selected.status.toUpperCase()}</p>
+        <motion.div key={selected.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="mb-3 flex items-center justify-between font-mono text-sm">
+            <span className="text-white">{selected.callsign}</span>
+            <span className="text-xs text-slate-400">{selected.team.toUpperCase()}</span>
           </div>
+
+          <div className="space-y-2">
+            {[
+              ['Health', selected.health],
+              ['Morale', selected.morale],
+              ['Ammo', selected.ammo],
+            ].map(([label, value]) => (
+              <div key={label as string}>
+                <div className="mb-1 flex justify-between font-mono text-[11px] text-slate-300">
+                  <span>{label as string}</span>
+                  <span>{value as number}%</span>
+                </div>
+                <div className="h-2 rounded bg-black/40">
+                  <div className={`h-2 rounded ${meterColor(value as number)}`} style={{ width: `${value as number}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-3 font-mono text-xs text-tactical-amber">STATUS: {selected.status.toUpperCase()}</p>
+
           <div className="mt-4 grid grid-cols-2 gap-2">
             {commands.map((command) => (
               <button
@@ -36,8 +56,8 @@ export function UnitControlPanel() {
           </div>
         </motion.div>
       ) : (
-        <p className="font-mono text-xs text-slate-400">Select a unit on the map.</p>
+        <p className="font-mono text-xs text-slate-400">Selecciona una unidad en el mapa táctico.</p>
       )}
-    </div>
+    </section>
   );
 }

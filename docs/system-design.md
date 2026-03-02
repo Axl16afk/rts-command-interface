@@ -1,19 +1,26 @@
-# Tactical RTS Command Interface - System Design
+# Tactical RTS Command Interface — Arquitectura y Plan
 
-## 1) System Architecture
+## 1) Arquitectura del sistema
 
-- **Presentation layer (React + Tailwind + Framer Motion):** HUD panels, controls, terminal log, transitions.
-- **Simulation layer (Zustand store):** unit state, mission logs, selected entity, command dispatch, movement tick updates.
-- **Rendering layer (Canvas):** tactical map + fog-of-war and radar scanner animation loops.
-- **Interaction layer (event handlers):** click-select, waypoint assignment, pan, zoom, command button actions.
+El proyecto se organiza en cuatro capas:
 
-### High-level flow
-1. UI events dispatch actions into Zustand (`selectUnit`, `moveUnit`, `issueCommand`).
-2. Simulation tick updates unit positions each animation frame.
-3. Canvas components subscribe to state and redraw with current data.
-4. Logs are appended and animated in the mission console.
+1. **Presentación (React + Tailwind + Framer Motion)**
+   - Renderiza paneles HUD, consola, widgets y micro-animaciones.
+2. **Simulación (Zustand)**
+   - Mantiene estado global de unidades, selección, logs y eventos de airstrike.
+3. **Render táctico (Canvas 2D)**
+   - Dibuja mapa, grid, unidades, rutas, niebla de guerra y explosiones.
+4. **Interacción**
+   - Traduce input de usuario (click, drag, wheel, shift+click) en acciones de simulación.
 
-## 2) Folder Structure
+### Flujo de datos
+
+- El usuario interactúa con `TacticalMap` o `UnitControlPanel`.
+- La acción invoca métodos de store (`moveUnit`, `issueCommand`, `callAirstrike`).
+- `App` ejecuta un loop de simulación (`tick`) y limpieza de efectos (`pruneEffects`).
+- Componentes Canvas y paneles se actualizan automáticamente por suscripción a Zustand.
+
+## 2) Estructura de carpetas
 
 ```txt
 src/
@@ -31,47 +38,52 @@ src/
   styles.css
 docs/
   system-design.md
+README.md
 ```
 
-## 3) State Design (Zustand)
+## 3) Diseño de estado (Zustand)
 
-- `units: Unit[]` - entities, current position and destination.
-- `selectedUnitId: string | null` - active selection in UI.
-- `missionLogs: MissionLog[]` - timestamped terminal feed.
-- `selectUnit(id)` - set active unit.
-- `moveUnit(id, point)` - assign waypoint and log.
-- `issueCommand(id, command)` - update tactical behavior and log.
-- `tick(deltaSeconds)` - deterministic movement interpolation.
-- `addLog(message)` - generic mission event injection.
+- `units: Unit[]`
+- `selectedUnitId: string | null`
+- `missionLogs: MissionLog[]`
+- `activeAirstrikes: AirstrikeEvent[]`
+- `selectUnit(id)`
+- `moveUnit(id, destination)`
+- `issueCommand(id, command)`
+- `callAirstrike(position)`
+- `tick(deltaSeconds)`
+- `pruneEffects()`
 
-## 4) Data Models
+## 4) Modelos de datos
 
-- `Unit`: identity, side, movement, health, morale, ammo, status command.
-- `Point`: map-space x/y coordinates.
-- `RadarBlip`: spawn angle/radius and timestamp for decay.
-- `MissionLog`: time + message for terminal output.
-- `UnitCommand`: union of `move | attack | defend | recon`.
+- `Unit`: identidad táctica, team, posición, destino, recursos y visibilidad.
+- `UnitCommand`: `move | attack | defend | recon`.
+- `MissionLog`: timestamp, mensaje y severidad (`info/warning/critical`).
+- `RadarBlip`: detección temporal para radar con intensidad.
+- `AirstrikeEvent`: punto de impacto, radio y vida útil para FX.
 
-## 5) Step-by-step Build Plan
+## 5) Plan de construcción paso a paso
 
-1. Bootstrap Vite React + TypeScript + Tailwind project.
-2. Define domain models for units, logs, blips, commands.
-3. Build Zustand store with actions and simulation tick.
-4. Implement `TacticalMap` canvas (grid, units, selection, movement, pan/zoom, fog).
-5. Implement `RadarScanner` canvas (sweep cone, random blips, fade out).
-6. Add `UnitControlPanel` with Framer Motion transitions and command buttons.
-7. Add terminal-style `MissionLogConsole` with auto-scroll and typing effect.
-8. Integrate components in `App` with dark military theme and glitch accents.
-9. Extend with airstrike overlay + damage reaction system next.
+1. Inicializar proyecto React + TS + Tailwind + Framer Motion + Zustand.
+2. Definir tipos de dominio en `models.ts`.
+3. Construir store con acciones y simulación base.
+4. Implementar Canvas de mapa con pan/zoom y selección.
+5. Añadir niebla de guerra y rutas de movimiento.
+6. Integrar control panel y consola de misión.
+7. Implementar radar con sweep y blips con desvanecimiento.
+8. Implementar airstrike (input + daño + animación + logs).
+9. Pulir tema visual HUD y micro-animaciones.
 
-## 6) Starter Implementation Scope in this repo
+## 6) Estado actual del starter implementado
 
-Implemented now:
-- Tactical map with realtime unit motion, click select/move, drag pan, zoom wheel, fog-of-war.
-- Radar scanner with circular sweep animation + random fading enemy blips.
-- Control panel and mission log starter for interaction testing.
+Incluye:
+- Mapa táctico interactivo (selección, movimiento, pan/zoom, fog, rutas).
+- Radar en Canvas con sweep continuo y blips dinámicos.
+- Panel de control de unidad con métricas y comandos.
+- Consola tipo terminal con autoscroll y typing effect.
+- Simulación de airstrike con daño radial + logs críticos.
 
-Planned next iteration:
-- Airstrike coordinate targeting and explosion FX.
-- Better map layers and pathfinding.
-- Deterministic simulation clock + scenario scripting.
+Siguiente iteración sugerida:
+- Pathfinding por waypoints y obstáculos.
+- IA enemiga ligera (patrol, engage, fallback).
+- Escenarios con objetivos y condiciones de victoria/derrota.

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { useBattleStore } from '../store/useBattleStore';
 
 const MAP_WIDTH = 1200;
@@ -6,30 +7,37 @@ const MAP_HEIGHT = 800;
 
 export function TacticalMap() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [scale, setScale] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [dragging, setDragging] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: -130, y: -80 });
+  const [isPanning, setIsPanning] = useState(false);
   const [dragOrigin, setDragOrigin] = useState({ x: 0, y: 0 });
 
   const units = useBattleStore((state) => state.units);
   const selectedUnitId = useBattleStore((state) => state.selectedUnitId);
+  const activeAirstrikes = useBattleStore((state) => state.activeAirstrikes);
   const selectUnit = useBattleStore((state) => state.selectUnit);
   const moveUnit = useBattleStore((state) => state.moveUnit);
+  const callAirstrike = useBattleStore((state) => state.callAirstrike);
+
+  const screenToMap = (screenX: number, screenY: number) => ({
+    x: (screenX - pan.x) / zoom,
+    y: (screenY - pan.y) / zoom,
+  });
 
   useEffect(() => {
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
 
-    const { width, height } = canvasRef.current;
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = '#030913';
-    ctx.fillRect(0, 0, width, height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#02060f';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
-    ctx.translate(offset.x, offset.y);
-    ctx.scale(scale, scale);
+    ctx.translate(pan.x, pan.y);
+    ctx.scale(zoom, zoom);
 
-    ctx.strokeStyle = 'rgba(124, 255, 77, 0.2)';
+    ctx.strokeStyle = 'rgba(124,255,77,0.18)';
     ctx.lineWidth = 1;
     for (let x = 0; x <= MAP_WIDTH; x += 40) {
       ctx.beginPath();
@@ -37,7 +45,6 @@ export function TacticalMap() {
       ctx.lineTo(x, MAP_HEIGHT);
       ctx.stroke();
     }
-
     for (let y = 0; y <= MAP_HEIGHT; y += 40) {
       ctx.beginPath();
       ctx.moveTo(0, y);
@@ -45,8 +52,10 @@ export function TacticalMap() {
       ctx.stroke();
     }
 
-    for (const unit of units) {
-      ctx.fillStyle = unit.team === 'friendly' ? '#7CFF4D' : '#ff7a7a';
+    units.forEach((unit) => {
+      if (!unit.isVisible && unit.team === 'enemy') return;
+
+      ctx.fillStyle = unit.team === 'friendly' ? '#7CFF4D' : '#ff6b6b';
       ctx.beginPath();
       ctx.arc(unit.position.x, unit.position.y, 7, 0, Math.PI * 2);
       ctx.fill();
@@ -58,71 +67,85 @@ export function TacticalMap() {
         ctx.arc(unit.position.x, unit.position.y, 13, 0, Math.PI * 2);
         ctx.stroke();
       }
-    }
 
-    const gradient = ctx.createRadialGradient(
-      MAP_WIDTH * 0.5,
-      MAP_HEIGHT * 0.5,
-      200,
-      MAP_WIDTH * 0.5,
-      MAP_HEIGHT * 0.5,
-      620,
-    );
-    gradient.addColorStop(0, 'rgba(0,0,0,0.1)');
-    gradient.addColorStop(1, 'rgba(0,0,0,0.72)');
-    ctx.fillStyle = gradient;
+      ctx.strokeStyle = 'rgba(124,255,77,0.6)';
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(unit.position.x, unit.position.y);
+      ctx.lineTo(unit.destination.x, unit.destination.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    activeAirstrikes.forEach((event) => {
+      const age = Date.now() - event.startedAt;
+      const progress = Math.min(1, age / 900);
+      ctx.fillStyle = `rgba(255,120,60,${1 - progress})`;
+      ctx.beginPath();
+      ctx.arc(event.position.x, event.position.y, event.radius * progress, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    const fog = ctx.createRadialGradient(MAP_WIDTH * 0.55, MAP_HEIGHT * 0.5, 220, MAP_WIDTH * 0.55, MAP_HEIGHT * 0.5, 700);
+    fog.addColorStop(0, 'rgba(0,0,0,0.1)');
+    fog.addColorStop(1, 'rgba(0,0,0,0.78)');
+    ctx.fillStyle = fog;
     ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
     ctx.restore();
-  }, [units, selectedUnitId, scale, offset]);
+  }, [units, selectedUnitId, zoom, pan, activeAirstrikes]);
 
-  const screenToMap = (screenX: number, screenY: number) => ({
-    x: (screenX - offset.x) / scale,
-    y: (screenY - offset.y) / scale,
-  });
+  const onCanvasClick = (event: ReactMouseEvent<HTMLCanvasElement>) => {
+    if (isPanning) return;
 
-  const onMapClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    const map = screenToMap(event.clientX - rect.left, event.clientY - rect.top);
+    const target = screenToMap(event.clientX - rect.left, event.clientY - rect.top);
 
-    const clickedUnit = units.find((unit) => Math.hypot(unit.position.x - map.x, unit.position.y - map.y) < 12);
-    if (clickedUnit) {
-      selectUnit(clickedUnit.id);
+    const clicked = units.find((unit) => Math.hypot(unit.position.x - target.x, unit.position.y - target.y) < 12);
+    if (clicked) {
+      selectUnit(clicked.id);
+      return;
+    }
+
+    if (event.shiftKey) {
+      callAirstrike(target);
       return;
     }
 
     if (selectedUnitId) {
-      moveUnit(selectedUnitId, map);
+      moveUnit(selectedUnitId, target);
     }
   };
 
   return (
-    <div className="rounded-xl border border-tactical-neon/30 bg-tactical-panel/50 p-2 shadow-hud">
-      <div className="mb-2 flex items-center justify-between font-mono text-xs text-tactical-neon">
-        <span>Tactical Map</span>
-        <span>ZOOM {Math.round(scale * 100)}%</span>
-      </div>
+    <section className="rounded-xl border border-tactical-neon/30 bg-tactical-panel/50 p-2 shadow-hud">
+      <header className="mb-2 flex items-center justify-between font-mono text-xs text-tactical-neon">
+        <span>TACTICAL MAP</span>
+        <span>ZOOM {Math.round(zoom * 100)}% · SHIFT+CLICK AIRSTRIKE</span>
+      </header>
       <canvas
         ref={canvasRef}
-        width={800}
-        height={500}
+        width={920}
+        height={520}
         className="w-full cursor-crosshair rounded border border-tactical-neon/20"
         onWheel={(event) => {
           event.preventDefault();
-          setScale((value) => Math.min(2.2, Math.max(0.6, value + (event.deltaY > 0 ? -0.1 : 0.1))));
+          const delta = event.deltaY > 0 ? -0.1 : 0.1;
+          setZoom((prev) => Math.max(0.55, Math.min(2.6, prev + delta)));
         }}
         onMouseDown={(event) => {
-          setDragging(true);
-          setDragOrigin({ x: event.clientX - offset.x, y: event.clientY - offset.y });
+          if (event.button !== 0) return;
+          setIsPanning(true);
+          setDragOrigin({ x: event.clientX - pan.x, y: event.clientY - pan.y });
         }}
         onMouseMove={(event) => {
-          if (!dragging) return;
-          setOffset({ x: event.clientX - dragOrigin.x, y: event.clientY - dragOrigin.y });
+          if (!isPanning) return;
+          setPan({ x: event.clientX - dragOrigin.x, y: event.clientY - dragOrigin.y });
         }}
-        onMouseUp={() => setDragging(false)}
-        onMouseLeave={() => setDragging(false)}
-        onClick={onMapClick}
+        onMouseUp={() => setIsPanning(false)}
+        onMouseLeave={() => setIsPanning(false)}
+        onClick={onCanvasClick}
       />
-    </div>
+    </section>
   );
 }
